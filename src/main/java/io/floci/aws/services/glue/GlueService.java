@@ -3238,6 +3238,30 @@ public class GlueService {
         }
     }
 
+    /**
+     * The tags of the resource stored under {@code arn}, in the account and Region it names: a registry's or a schema's
+     * from the schema registry, any other resource's from the tags applied to its ARN, which Glue drops when it deletes
+     * the resource; read in place and empty for an ARN naming nothing tagged. Only string values are tags: TagResource
+     * keeps the request's map as given.
+     */
+    public Map<String, String> storedTags(String arn) {
+        if (!AwsArnUtils.isArnFor(arn, "glue")) {
+            return Map.of();
+        }
+        AwsArnUtils.Arn parsed = AwsArnUtils.parse(arn);
+        String resource = parsed.resource();
+        Map<String, ?> applied = resource.startsWith("registry/") || resource.startsWith("schema/")
+                ? schemaRegistryService.storedTags(arn)
+                : resourceGroupsTaggingService.storedTags(parsed.accountId(), parsed.region(), arn);
+        Map<String, String> tags = new LinkedHashMap<>();
+        applied.forEach((key, value) -> {
+            if (value instanceof String text) {
+                tags.put(key, text);
+            }
+        });
+        return tags;
+    }
+
     private void validateArn(String arn) {
         if (!AwsArnUtils.looksLikeArn(arn)) {
             throw new AwsException("InvalidInputException", "Invalid ARN", 400);

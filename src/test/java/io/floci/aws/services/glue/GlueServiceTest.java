@@ -1661,6 +1661,28 @@ class GlueServiceTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void storedTagsAreTheStringTagsOfTheJobOrTheRegistryTheArnNames() {
+        glueService.createJob(createValidJob("stored-tags-job"), Map.of("team", "data"), REGION);
+        String jobArn = "arn:aws:glue:" + REGION + ":" + ACCOUNT_ID + ":job/stored-tags-job";
+        String registryArn = schemaRegistryService.createRegistry("stored-tags-registry", null,
+                Map.of("team", "stream"), REGION).getRegistryArn();
+        Map<String, String> mixed = (Map<String, String>) (Map<?, ?>) Map.of("owner", "ingest", "count", 5);
+        glueService.tagResource(jobArn, mixed, REGION);
+
+        assertEquals(Map.of("team", "data", "owner", "ingest"), glueService.storedTags(jobArn));
+        assertEquals(Map.of("team", "stream"), glueService.storedTags(registryArn));
+        assertEquals(Map.of(), glueService.storedTags(jobArn.replace(ACCOUNT_ID, "111111111111")));
+        assertEquals(Map.of(), glueService.storedTags(jobArn.replace(REGION, "us-west-2")));
+        assertEquals(Map.of(), glueService.storedTags(registryArn.replace(REGION, "us-west-2")));
+        assertEquals(Map.of(), glueService.storedTags(registryArn + "-missing"));
+
+        glueService.deleteJob("stored-tags-job", REGION);
+
+        assertEquals(Map.of(), glueService.storedTags(jobArn));
+    }
+
+    @Test
     void jobAndCrawlerRejectsDuplicateCreation() {
         Job job = createValidJob("dup-job");
         glueService.createJob(job);
